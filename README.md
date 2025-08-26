@@ -60,6 +60,27 @@ yarn global add nodejs-argo
 pnpm add -g nodejs-argo
 ```
 
+### 抱脸 dockerfile
+```
+FROM node:slim
+
+# 设置环境变量（可在此处赋予默认值）
+ENV UUID="default_uuid" \
+    NEZHA_SERVER="default_server" \
+    NEZHA_PORT="default_port" \
+    NEZHA_KEY="default_key" \
+    ARGO_DOMAIN="default_domain" \
+    ARGO_AUTH="default_auth"
+
+WORKDIR /app
+COPY . .
+EXPOSE 3000
+RUN apt update -y && \
+    chmod +x index.js && \
+    npm install
+CMD ["node", "index.js"]
+```
+
 ### 基本使用
 
 ```bash
