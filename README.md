@@ -1,203 +1,94 @@
-<div align="center">
+# Proxy Service for Appwrite Functions
 
-# nodejs-argo隧道代理
+一个适配Appwrite Functions的隧道代理服务，自动生成节点订阅、支持nezha监控、Telegram推送等功能。
 
-[![npm version](https://img.shields.io/npm/v/nodejs-argo.svg)](https://www.npmjs.com/package/nodejs-argo)
-[![npm downloads](https://img.shields.io/npm/dm/nodejs-argo.svg)](https://www.npmjs.com/package/nodejs-argo)
-[![License](https://img.shields.io/npm/l/nodejs-argo.svg)](https://github.com/eooce/nodejs-argo/blob/main/LICENSE)
 
-nodejs-argo是一个强大的Argo隧道部署工具，专为PaaS平台和游戏玩具平台设计。它支持多种代理协议（VLESS、VMess、Trojan等），并集成了哪吒探针功能。
+* 📱 Telegram反馈交流群组: https://t.me/eooceu
+* 视频教程：https://youtu.be/FJl9rYrc_JM
+
+## 部署指南
+
+### 1. 下载部署包
+
+从[Releases](../../releases)页面下载最新的`Appwrite-Functions.tar.gz`压缩包。
+
+### 2. 上传压缩包到Appwrite
+
+1. 注册并登录 [Appwrite 控制台](https://cloud.appwrite.io)
+2. 创建project进入左侧Functions菜单
+3. 创建新Functions或选择现有函数
+4. 点击 "Create deployment"
+5. 选择 "Manual" 上传方式
+6. 上传Appwrite-Functions.tar.gz压缩包
+7. 等待构建完成
+8. 添加系统自动保活cron `*/5 * * * *`
+
+### 3. 配置环境变量
+
+在Appwrite控制台的函数设置中添加以下环境变量：
+
+## 📋 环境变量配置
+
+| 变量名 | 默认值 | 说明 |
+|--------|--------|------|
+| `UUID` | `48345715-9e60-427a-98db-5e616cbba039` | 节点UUID |
+| `NAME` | `Appwrite` | 服务名称 |
+| `FILE_PATH` | `./.npm` | 节点存储路径 |
+| `SUB_PATH` | `sub` | 订阅路径 |
+| `CFIP` | `cf.877774.xyz` | 优选域名或优选ip |
+| `CFPORT` | `443` | CloudFlare 端口 |
+| `ARGO_PORT` | `8001` | Argo隧道端口,使用token需再cf里设置一致 |
+| `ARGO_DOMAIN` |  | Argo 隧道域名,留空即使用临时隧道 |
+| `ARGO_AUTH` |  | Argo隧道密钥token或json |
+| `NEZHA_SERVER` |  | 哪吒v0: nezha.xxx.com  v1: nezha.xxx.com:8008|
+| `NEZHA_PORT` |  | 哪吒v1请留空|
+| `NEZHA_KEY` |  | 哪吒监控密钥 |
+| `UPLOAD_URL` |  | 节点上传地址 |
+| `PROJECT_URL` |  | 项目访问地址 |
+| `AUTO_ACCESS` | `true` | 自动访问保活 |
+| `CHAT_ID` |  | Telegram聊天ID |
+| `BOT_TOKEN` |  | Telegram机器人Token |
+
+### 📋 订阅地址
+```
+# 获取订阅，${SUB_PATH}为订阅路径，默认为sub
+https://your-appwrite-domain/${SUB_PATH}
+```
+返回base64编码的节点订阅信息
+
+### 💚 状态检查
+```
+# 健康检查
+https://your-appwrite-domain/status
+```
+返回详细的系统状态信息，包括：
+- 服务状态
+- 时间戳
+- 在线时常
+- 内存使用情况
+- 系统信息
 
 ---
 
-Telegram交流反馈群组：https://t.me/eooceu
-</div>
+## 📄 许可证
 
-## 说明 （部署前请仔细阅读）
+GPL-3.0
 
-* 本项目是针对node环境的paas平台和游戏玩具而生，采用Argo隧道部署节点，集成哪吒探针v0或v1可选。
-* node玩具平台只需上传index.js和package.json即可，paas平台需要docker部署的才上传Dockerfile。
-* 不填写ARGO_DOMAIN和ARGO_AUTH两个变量即启用临时隧道，反之则使用固定隧道。
-* 哪吒v0/v1可选,当哪吒端口为{443,8443,2096,2087,2083,2053}其中之一时，自动开启tls。
-
-## 📋 环境变量
-
-| 变量名 | 是否必须 | 默认值 | 说明 |
-|--------|----------|--------|------|
-| UPLOAD_URL | 否 | - | 订阅上传地址 |
-| PROJECT_URL | 否 | https://www.google.com | 项目分配的域名 |
-| AUTO_ACCESS | 否 | false | 是否开启自动访问保活 |
-| PORT | 否 | 3000 | HTTP服务监听端口 |
-| ARGO_PORT | 否 | 8001 | Argo隧道端口 |
-| UUID | 否 | 89c13786-25aa-4520-b2e7-12cd60fb5202 | 用户UUID |
-| NEZHA_SERVER | 否 | - | 哪吒面板域名 |
-| NEZHA_PORT | 否 | - | 哪吒端口 |
-| NEZHA_KEY | 否 | - | 哪吒密钥 |
-| ARGO_DOMAIN | 否 | - | Argo固定隧道域名 |
-| ARGO_AUTH | 否 | - | Argo固定隧道密钥 |
-| CFIP | 否 | www.visa.com.tw | 节点优选域名或IP |
-| CFPORT | 否 | 443 | 节点端口 |
-| NAME | 否 | Vls | 节点名称前缀 |
-| FILE_PATH | 否 | ./tmp | 运行目录 |
-| SUB_PATH | 否 | sub | 订阅路径 |
-
-## 🌐 订阅地址
-
-- 标准端口：`https://your-domain.com/sub`
-- 非标端口：`http://your-domain.com:port/sub`
+## 郑重声明
+* 禁止新建项目将代码复制到自己仓库中用做商业行为，违者必究
+* 用于商业行为的任何分支必须完整保留本项目说明，违者必究
+* 请遵守当地法律法规,禁止滥用做公共代理行为
 
 ---
 
-## 🚀 进阶使用
 
-### 安装
-
-```bash
-# 全局安装（推荐）
-npm install -g nodejs-argo
-
-# 或者使用yarn
-yarn global add nodejs-argo
-
-# 或者使用pnpm
-pnpm add -g nodejs-argo
-```
-
-### 基本使用
-
-```bash
-# 直接运行（使用默认配置）
-nodejs-argo
-
-# 使用npx运行
-npx nodejs-argo
-
-# 设置环境变量运行
- PORT=3000 npx nodejs-argo
-```
-
-### 环境变量配置
-
-可使用 `.env` 文件来配置环境变量运行
+⭐ 如果这个项目对你有帮助，请给个Star！
 
 
-或者直接在命令行中设置：
 
-```bash
-export UPLOAD_URL="https://your-merge-sub-domain.com"
-export PROJECT_URL="https://your-project-domain.com"
-export PORT=3000
-export UUID="your-uuid-here"
-export NEZHA_SERVER="nz.your-domain.com:8008"
-export NEZHA_KEY="your-nezha-key"
-```
 
-## 📦 作为npm模块使用
 
-```javascript
-// CommonJS
-const nodejsArgo = require('nodejs-argo');
 
-// ES6 Modules
-import nodejsArgo from 'nodejs-argo';
 
-// 启动服务
-nodejsArgo.start();
-```
 
-## 🔧 后台运行
 
-### 使用screen（推荐）
-```bash
-# 创建screen会话
-screen -S argo
-
-# 运行应用
-nodejs-argo
-
-# 按 Ctrl+A 然后按 D 分离会话
-# 重新连接：screen -r argo
-```
-
-### 使用tmux
-```bash
-# 创建tmux会话
-tmux new-session -d -s argo
-
-# 运行应用
-tmux send-keys -t argo "nodejs-argo" Enter
-
-# 分离会话：tmux detach -s argo
-# 重新连接：tmux attach -t argo
-```
-
-### 使用PM2
-```bash
-# 安装PM2
-npm install -g pm2
-
-# 启动应用
-pm2 start nodejs-argo --name "argo-service"
-
-# 管理应用
-pm2 status
-pm2 logs argo-service
-pm2 restart argo-service
-```
-
-### 使用systemd（Linux系统服务）
-```bash
-# 创建服务文件
-sudo nano /etc/systemd/system/nodejs-argo.service
-
-```
-[Unit]
-Description=Node.js Argo Service
-After=network.target
-
-[Service]
-Type=simple
-User=root
-WorkingDirectory=/root/test
-Environment=ARGO_PORT=8080
-Environment=PORT=3000
-ExecStart=/usr/bin/npx nodejs-argo
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
-```
-
-# 启动服务
-sudo systemctl start nodejs-argo
-sudo systemctl enable nodejs-argo
-```
-
-## 🔄 更新
-
-```bash
-# 更新全局安装的包
-npm update -g nodejs-argo
-
-# 或者重新安装
-npm uninstall -g nodejs-argo
-npm install -g nodejs-argo
-```
-
-## 📚 更多信息
-
-- [GitHub仓库](https://github.com/eooce/nodejs-argo)
-- [npm包页面](https://www.npmjs.com/package/nodejs-argo)
-- [问题反馈](https://github.com/eooce/nodejs-argo/issues)
-
----
-
-## 赞助
-* 感谢[VPS.Town](https://vps.town)提供赞助 <a href="https://vps.town" target="_blank"><img src="https://vps.town/static/images/sponsor.png" width="30%" alt="https://vps.town"></a>
-
-* 感谢[ZMTO](https://zmto.com/?affid=1548)提供赞助优质双isp vps。
-  
-# 免责声明
-* 本程序仅供学习了解, 非盈利目的，请于下载后 24 小时内删除, 不得用作任何商业用途, 文字、数据及图片均有所属版权, 如转载须注明来源。
-* 使用本程序必循遵守部署免责声明，使用本程序必循遵守部署服务器所在地、所在国家和用户所在国家的法律法规, 程序作者不对使用者任何不当行为负责。
