@@ -118,6 +118,20 @@ jobs:
             done
           } > release_notes.md
 
+      - name: Delete old release (if exists)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          echo "🧹 检查旧的 release 是否存在..."
+          if gh release view "appwrite-functions-latest" >/dev/null 2>&1; then
+            echo "⚠️ 发现旧的 release，正在删除..."
+            gh release delete "appwrite-functions-latest" --yes
+            echo "✅ 已删除旧的 release。"
+          else
+            echo "ℹ️ 未找到旧的 release。"
+          fi
+
       - name: Create or Update Release
         uses: softprops/action-gh-release@v2
         with:
