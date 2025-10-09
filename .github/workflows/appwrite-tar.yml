@@ -2,7 +2,7 @@ name: Build and Release Appwrite
 
 on:
   push:
-    branches: [ appwrite ]
+    branches: [appwrite]
     paths:
       - 'appwrite-*'
       - 'appwrite-*/**'
@@ -18,123 +18,123 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code (Appwrite 分支)
-      uses: actions/checkout@v4
-      with:
-        ref: appwrite
+      - name: Checkout code (Appwrite 分支)
+        uses: actions/checkout@v4
+        with:
+          ref: appwrite
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '20'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
 
-    - name: Validate there are appwrite-* directories
-      run: |
-        set -euo pipefail
-        shopt -s nullglob
-        matches=(appwrite-*/)
-        if [ ${#matches[@]} -eq 0 ]; then
-          echo "❌ 未发现任何以 appwrite- 开头的目录（顶层）"
-          exit 1
-        fi
-        echo "✅ 找到以下目录："
-        for d in "${matches[@]}"; do
-          echo " - ${d%/}"
-        done
+      - name: Validate there are appwrite-* directories
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          matches=(appwrite-*/)
+          if [ ${#matches[@]} -eq 0 ]; then
+            echo "❌ 未发现任何以 appwrite- 开头的顶层目录"
+            exit 1
+          fi
+          echo "✅ 找到以下目录："
+          for d in "${matches[@]}"; do
+            echo " - ${d%/}"
+          done
 
-    - name: Display directory info
-      run: |
-        set -euo pipefail
-        echo "📂 根目录列表:"
-        ls -la
-        echo ""
-        shopt -s nullglob
-        for d in appwrite-*/; do
-          dir="${d%/}"
-          echo "📁 ${dir} 内容:"
-          ls -la "$dir" || true
+      - name: Display directory info
+        run: |
+          set -euo pipefail
+          echo "📂 根目录列表:"
+          ls -la
           echo ""
-        done
+          shopt -s nullglob
+          for d in appwrite-*/; do
+            dir="${d%/}"
+            echo "📁 ${dir} 内容:"
+            ls -la "$dir" || true
+            echo ""
+          done
 
-    - name: Create deployment archives
-      id: package
-      run: |
-        set -euo pipefail
-        shopt -s nullglob
-        TIMESTAMP=$(date -u +"%Y%m%d%H%M%S")
-        echo "当前UTC时间戳: $TIMESTAMP"
-        mkdir -p dist
-        created=()
-        for d in appwrite-*/; do
-          dir="${d%/}"
-          ARCHIVE_NAME="${dir}.${TIMESTAMP}.tar.gz"
-          tar -czf "dist/${ARCHIVE_NAME}" "$dir"
-          echo "✅ 已创建： dist/${ARCHIVE_NAME}"
-          created+=("dist/${ARCHIVE_NAME}")
-        done
-        if [ ${#created[@]} -eq 0 ]; then
-          echo "❌ 未生成任何压缩包（可能没有匹配目录）"
-          exit 1
-        fi
-        # 将压缩包列表输出到 GITHUB_OUTPUT，供后续步骤引用（可选）
-        echo "archives=${created[*]}" >> $GITHUB_OUTPUT
+      - name: Create deployment archives
+        id: package
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          TIMESTAMP=$(date -u +"%Y%m%d%H%M%S")
+          echo "当前UTC时间戳: $TIMESTAMP"
+          mkdir -p dist
+          created=()
+          for d in appwrite-*/; do
+            dir="${d%/}"
+            ARCHIVE_NAME="${dir}.${TIMESTAMP}.tar.gz"
+            tar -czf "dist/${ARCHIVE_NAME}" "$dir"
+            echo "✅ 已创建： dist/${ARCHIVE_NAME}"
+            created+=("dist/${ARCHIVE_NAME}")
+          done
+          if [ ${#created[@]} -eq 0 ]; then
+            echo "❌ 未生成任何压缩包（可能没有匹配目录）"
+            exit 1
+          fi
+          echo "archives=${created[*]}" >> $GITHUB_OUTPUT
 
-    - name: Verify archives
-      run: |
-        set -euo pipefail
-        echo "📦 dist/ 目录内容："
-        ls -lh dist/ || true
-        for f in dist/*.tar.gz; do
-          echo "🔍 查看 $f 内容:"
-          tar -tzf "$f"
-          echo ""
-        done
+      - name: Verify archives
+        run: |
+          set -euo pipefail
+          echo "📦 dist/ 目录内容："
+          ls -lh dist/ || true
+          for f in dist/*.tar.gz; do
+            echo "🔍 查看 $f 内容:"
+            tar -tzf "$f"
+            echo ""
+          done
 
-    - name: Generate release notes
-      id: release_notes
-      run: |
-        set -euo pipefail
-        LATEST_COMMIT=$(git log -1 --pretty=format:"%s")
-        COMMIT_AUTHOR=$(git log -1 --pretty=format:"%an")
-        COMMIT_DATE=$(git log -1 --pretty=format:"%cd" --date=format:"%Y-%m-%d %H:%M")
-        SHORT_SHA=$(git rev-parse --short HEAD)
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          set -euo pipefail
+          LATEST_COMMIT=$(git log -1 --pretty=format:"%s")
+          COMMIT_AUTHOR=$(git log -1 --pretty=format:"%an")
+          COMMIT_DATE=$(git log -1 --pretty=format:"%cd" --date=format:"%Y-%m-%d %H:%M")
+          SHORT_SHA=$(git rev-parse --short HEAD)
 
-        cat > release_notes.md <<EOF
-## 🚀 Appwrite Functions 部署包
+          {
+            echo "## 🚀 Appwrite Functions 部署包"
+            echo ""
+            echo "本次构建自动打包了仓库中所有以 **appwrite-** 开头的目录。"
+            echo ""
+            echo "**最近提交：**"
+            echo "- 提交信息: ${LATEST_COMMIT}"
+            echo "- 提交作者: ${COMMIT_AUTHOR}"
+            echo "- 提交时间: ${COMMIT_DATE}"
+            echo "- 提交版本: ${SHORT_SHA}"
+            echo ""
+            echo "📦 打包时间 (UTC): $(date -u +"%Y-%m-%d %H:%M:%S")"
+            echo ""
+            echo "**上传的压缩包：**"
+            for f in dist/*.tar.gz; do
+              echo "- ${f}"
+            done
+          } > release_notes.md
 
-本次构建自动打包了仓库中所有以 **appwrite-** 开头的目录。
+      - name: Create or Update Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "appwrite-functions-latest"
+          name: "Appwrite Functions"
+          body_path: release_notes.md
+          files: dist/*.tar.gz
+          draft: false
+          prerelease: false
+          make_latest: true
+          overwrite_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-**最近提交：**
-- 提交信息: ${LATEST_COMMIT}
-- 提交作者: ${COMMIT_AUTHOR}
-- 提交时间: ${COMMIT_DATE}
-- 提交版本: ${SHORT_SHA}
-
-📦 打包时间 (UTC): $(date -u +"%Y-%m-%d %H:%M:%S")
-
-**上传的压缩包：**
-$(for f in dist/*.tar.gz; do echo "- ${f}"; done)
-
-EOF
-
-    - name: Create or Update Release
-      uses: softprops/action-gh-release@v2
-      with:
-        tag_name: "appwrite-functions-latest"
-        name: "Appwrite Functions"
-        body_path: release_notes.md
-        files: dist/*.tar.gz
-        draft: false
-        prerelease: false
-        make_latest: true
-        overwrite_files: true
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Release Summary
-      run: |
-        echo "🎉 自动构建与发布完成！"
-        echo "📦 已生成的包："
-        ls -lh dist/ || true
-        echo "🏷️ 发布名称: Appwrite Functions"
-        echo "🔗 发布地址: https://github.com/${{ github.repository }}/releases/tag/appwrite-functions-latest"
+      - name: Release Summary
+        run: |
+          echo "🎉 自动构建与发布完成！"
+          echo "📦 已生成的包："
+          ls -lh dist/ || true
+          echo "🏷️ 发布名称: Appwrite Functions"
+          echo "🔗 发布地址: https://github.com/${{ github.repository }}/releases/tag/appwrite-functions-latest"
