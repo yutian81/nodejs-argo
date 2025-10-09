@@ -59,25 +59,25 @@ jobs:
       - name: Create deployment archives
         id: package
         run: |
+          set -euo pipefail
           TIMESTAMP=$(date -u +"%Y%m%d%H%M%S")
           echo "当前UTC时间戳: $TIMESTAMP"
           mkdir -p dist
-          
+
           for dir in $(find . -maxdepth 1 -type d -name "appwrite-*"); do
             BASENAME=$(basename "$dir")
             ARCHIVE_NAME="${BASENAME}.${TIMESTAMP}.tar.gz"
             echo "📦 正在打包 $dir → dist/${ARCHIVE_NAME}"
-            # 进入目录打包内容，而不是整个文件夹
             tar -czf "dist/${ARCHIVE_NAME}" -C "$dir" .
             echo "✅ 已创建压缩包: dist/${ARCHIVE_NAME}"
           done
 
-          if [ ${#created[@]} -eq 0 ]; then
+          if ! ls dist/*.tar.gz >/dev/null 2>&1; then
             echo "❌ 未生成任何压缩包（可能没有匹配目录）"
             exit 1
           fi
-          
-          echo "archives=$(ls dist/*.tar.gz | tr '\n' ' ')" >> $GITHUB_OUTPUT
+
+          echo "archives=$(ls dist/*.tar.gz | tr '\n' ' ')" >> "$GITHUB_OUTPUT"
 
       - name: Verify archives
         run: |
@@ -86,7 +86,7 @@ jobs:
           ls -lh dist/ || true
           for f in dist/*.tar.gz; do
             echo "🔍 查看 $f 内容:"
-            tar -tzf "$f"
+            tar -tzf "$f" | head -n 20
             echo ""
           done
 
