@@ -1,10 +1,9 @@
-import express from "express";
-import fs from "fs";
-import path from "path";
-import os from "os";
-import axios from "axios";
-import { spawn } from "child_process";
-
+const express = require("express");
+const fs = require("fs");
+const path = require("path");
+const os = require("os");
+const axios = require("axios");
+const { spawn } = require("child_process");
 const app = express();
 
 // ==== 基础环境变量 ====
