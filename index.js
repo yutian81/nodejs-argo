@@ -597,9 +597,9 @@ async function startserver() {
   AddVisitTask();
   cleanFiles(); 
   console.log("Server setup complete.");
-  
-  // 确保 Express 只有在所有设置完成后才开始接收请求
-  app.listen(PORT, () => console.log(`http server is running on port:${PORT}!`));
 }
 
-startserver();
+app.listen(PORT, () => {
+    console.log(`http server is running on port:${PORT}! (Immediate listen)`);
+    startserver();
+});
