@@ -27,10 +27,14 @@ const CFPORT = process.env.CFPORT || 443;
 const NAME = process.env.NAME || '';
 
 // 定义路径 (基于 FILE_PATH 的路径)
-const webPath = path.join(FILE_PATH, 'web');
-const botPath = path.join(FILE_PATH, 'bot');
-const npmPath = path.join(FILE_PATH, 'npm');
-const phpPath = path.join(FILE_PATH, 'php');
+//const webPath = path.join(FILE_PATH, 'web');
+//const botPath = path.join(FILE_PATH, 'bot');
+//const npmPath = path.join(FILE_PATH, 'npm');
+//const phpPath = path.join(FILE_PATH, 'php');
+const WEB_EXECUTABLE = 'web';
+const BOT_EXECUTABLE = 'bot';
+const NPM_EXECUTABLE = 'npm';
+const PHP_EXECUTABLE = 'php';
 const subPath = path.join(FILE_PATH, 'sub.txt');
 const listPath = path.join(FILE_PATH, 'list.txt');
 const bootLogPath = path.join(FILE_PATH, 'boot.log');
@@ -115,140 +119,8 @@ const config = {
 };
 fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 
-// 判断系统架构
-function getSystemArchitecture() {
-  const arch = os.arch();
-  // 简化架构判断，适应常见云平台
-  if (arch.startsWith('arm') || arch.startsWith('aarch')) {
-    return 'arm';
-  } else {
-    return 'amd';
-  }
-}
-
-// 根据系统架构返回对应的url
-function getFilesForArchitecture(architecture) {
-  let baseFiles;
-  if (architecture === 'arm') {
-    baseFiles = [
-      { fileName: "web", fileUrl: "https://arm64.ssss.nyc.mn/web" },
-      { fileName: "bot", fileUrl: "https://arm64.ssss.nyc.mn/bot" }
-    ];
-  } else {
-    baseFiles = [
-      { fileName: "web", fileUrl: "https://amd64.ssss.nyc.mn/web" },
-      { fileName: "bot", fileUrl: "https://amd64.ssss.nyc.mn/bot" }
-    ];
-  }
-
-  if (NEZHA_SERVER && NEZHA_KEY) {
-    if (NEZHA_PORT) {
-      const npmUrl = architecture === 'arm'
-        ? "https://arm64.ssss.nyc.mn/agent"
-        : "https://amd64.ssss.nyc.mn/agent";
-        baseFiles.unshift({
-          fileName: "npm",
-          fileUrl: npmUrl
-        });
-    } else {
-      const phpUrl = architecture === 'arm'
-        ? "https://arm64.ssss.nyc.mn/v1"
-        : "https://amd64.ssss.nyc.mn/v1";
-      baseFiles.unshift({
-        fileName: "php",
-        fileUrl: phpUrl
-      });
-    }
-  }
-  return baseFiles;
-}
-
-// 下载对应系统架构的依赖文件
-function downloadFile(fileName, fileUrl, callback) {
-  const filePath = path.join(FILE_PATH, fileName);
-  const writer = fs.createWriteStream(filePath);
-
-  axios({
-    method: 'get',
-    url: fileUrl,
-    responseType: 'stream',
-    timeout: 30000 
-  })
-    .then(response => {
-      response.data.pipe(writer);
-
-      writer.on('finish', () => {
-        writer.close();
-        console.log(`Download ${fileName} successfully`);
-        callback(null, fileName);
-      });
-
-      writer.on('error', err => {
-        fs.unlink(filePath, () => { });
-        const errorMessage = `Download ${fileName} failed: ${err.message}`;
-        console.error(errorMessage);
-        callback(errorMessage);
-      });
-    })
-    .catch(err => {
-      const errorMessage = `Download ${fileName} failed: ${err.message}`;
-      console.error(errorMessage);
-      callback(errorMessage);
-    });
-}
-
 // 下载并运行依赖文件
 async function downloadFilesAndRun() {
-  const architecture = getSystemArchitecture();
-  const filesToDownload = getFilesForArchitecture(architecture);
-
-  if (filesToDownload.length === 0) {
-    console.log(`Can't find a file for the current architecture`);
-    return;
-  }
-
-  const downloadPromises = filesToDownload.map(fileInfo => {
-    return new Promise((resolve, reject) => {
-      downloadFile(fileInfo.fileName, fileInfo.fileUrl, (err, fileName) => {
-        if (err) {
-          reject(err);
-        } else {
-          resolve(fileName);
-        }
-      });
-    });
-  });
-
-  try {
-    await Promise.all(downloadPromises);
-  } catch (err) {
-    console.error('Error downloading files:', err);
-    return;
-  }
-
-  // 授权和运行
-  function authorizeFiles(filePaths) {
-    const newPermissions = 0o775;
-    filePaths.forEach(relativeFilePath => {
-      const absoluteFilePath = path.join(FILE_PATH, relativeFilePath);
-      if (fs.existsSync(absoluteFilePath)) {
-        try {
-          fs.chmodSync(absoluteFilePath, newPermissions);
-          console.log(`Empowerment success for ${absoluteFilePath}: ${newPermissions.toString(8)}`);
-        } catch (err) {
-          console.error(`Empowerment failed for ${absoluteFilePath}: ${err.message}`);
-        }
-      }
-    });
-  }
-
-  // 授权所有必要的二进制文件
-  const filesToAuthorize = ['./web', './bot'];
-  if (NEZHA_SERVER && NEZHA_KEY) {
-      filesToAuthorize.push(NEZHA_PORT ? './npm' : './php');
-  }
-  authorizeFiles(filesToAuthorize);
-
   // 运行ne-zha
   if (NEZHA_SERVER && NEZHA_KEY) {
     if (!NEZHA_PORT) {
