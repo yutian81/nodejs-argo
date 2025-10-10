@@ -11,8 +11,7 @@ const { execSync } = require('child_process');
 // 环境变量配置 (保持不变)
 const UPLOAD_URL = process.env.UPLOAD_URL || ''; 
 const PROJECT_URL = process.env.PROJECT_URL || '';
-const AUTO_ACCESS = process.env.AUTO_ACCESS === 'true'; 
-// *** 主要修改点：将默认的运行目录改为 /tmp ***
+const AUTO_ACCESS = process.env.AUTO_ACCESS === 'true';
 const FILE_PATH = process.env.FILE_PATH || '/tmp'; 
 const SUB_PATH = process.env.SUB_PATH || 'sub';
 const PORT = process.env.SERVER_PORT || process.env.PORT || 3000;
@@ -598,7 +597,9 @@ async function startserver() {
   AddVisitTask();
   cleanFiles(); 
   console.log("Server setup complete.");
+  
+  // 确保 Express 只有在所有设置完成后才开始接收请求
+  app.listen(PORT, () => console.log(`http server is running on port:${PORT}!`));
 }
-startserver();
 
-app.listen(PORT, () => console.log(`http server is running on port:${PORT}!`));
+startserver();
