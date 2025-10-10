@@ -2,7 +2,6 @@
   "name": "nodejs-argo",
   "version": "8.8.8",
   "description": "Thsi is a node project",
-  "type": "module",
   "main": "index.js",
   "author": "eooce",
   "repository": "https://github.com/eooce/nodejs-argo",
