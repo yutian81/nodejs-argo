@@ -1,0 +1,41 @@
+name: Build and Release NodeJS Argo
+
+on:
+  workflow_dispatch:  # 手动触发
+
+permissions:
+  contents: write     # 允许创建或修改 release
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout main branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Create ZIP and TAR.GZ packages
+        run: |
+          zip -j nodejs-argo.zip index.js package.json
+          tar -czf nodejs-argo.tar.gz index.js package.json
+
+      - name: Delete old release (if exists)
+        uses: dev-drprasad/delete-tag-and-release@v1.0
+        with:
+          tag_name: latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create new release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: nodejs-argo
+          tag_name: latest
+          files: |
+            nodejs-argo.zip
+            nodejs-argo.tar.gz
+          body: "自动打包发布 nodejs-argo.zip 和 nodejs-argo.tar.gz"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
