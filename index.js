@@ -27,14 +27,10 @@ const CFPORT = process.env.CFPORT || 443;
 const NAME = process.env.NAME || '';
 
 // 定义路径 (基于 FILE_PATH 的路径)
-//const webPath = path.join(FILE_PATH, 'web');
-//const botPath = path.join(FILE_PATH, 'bot');
-//const npmPath = path.join(FILE_PATH, 'npm');
-//const phpPath = path.join(FILE_PATH, 'php');
-const WEB_EXECUTABLE = 'web';
-const BOT_EXECUTABLE = 'bot';
-const NPM_EXECUTABLE = 'npm';
-const PHP_EXECUTABLE = 'php';
+const webPath = path.join(FILE_PATH, 'web');
+const botPath = path.join(FILE_PATH, 'bot');
+const npmPath = path.join(FILE_PATH, 'npm');
+const phpPath = path.join(FILE_PATH, 'php');
 const subPath = path.join(FILE_PATH, 'sub.txt');
 const listPath = path.join(FILE_PATH, 'list.txt');
 const bootLogPath = path.join(FILE_PATH, 'boot.log');
@@ -42,6 +38,11 @@ const configPath = path.join(FILE_PATH, 'config.json');
 const configYamlPath = path.join(FILE_PATH, 'config.yaml');
 const tunnelJsonPath = path.join(FILE_PATH, 'tunnel.json');
 const tunnelYamlPath = path.join(FILE_PATH, 'tunnel.yml');
+
+const WEB_EXECUTABLE = 'web';
+const BOT_EXECUTABLE = 'bot';
+const NPM_EXECUTABLE = 'npm';
+const PHP_EXECUTABLE = 'php';
 
 // 创建运行文件夹 (确保 /tmp 存在)
 if (!fs.existsSync(FILE_PATH)) {
