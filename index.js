@@ -11,8 +11,9 @@ const { execSync } = require('child_process');
 // 环境变量配置 (保持不变)
 const UPLOAD_URL = process.env.UPLOAD_URL || ''; 
 const PROJECT_URL = process.env.PROJECT_URL || '';
-const AUTO_ACCESS = process.env.AUTO_ACCESS === 'true'; // 确保布尔值正确解析
-const FILE_PATH = process.env.FILE_PATH || './tmp';
+const AUTO_ACCESS = process.env.AUTO_ACCESS === 'true'; 
+// *** 主要修改点：将默认的运行目录改为 /tmp ***
+const FILE_PATH = process.env.FILE_PATH || '/tmp'; 
 const SUB_PATH = process.env.SUB_PATH || 'sub';
 const PORT = process.env.SERVER_PORT || process.env.PORT || 3000;
 const UUID = process.env.UUID || '9afd1229-b893-40c1-84dd-51e7ce204913';
@@ -26,15 +27,22 @@ const CFIP = process.env.CFIP || 'cdns.doon.eu.org';
 const CFPORT = process.env.CFPORT || 443;
 const NAME = process.env.NAME || '';
 
-// 定义路径
+// 定义路径 (基于 FILE_PATH 的路径)
+const webPath = path.join(FILE_PATH, 'web');
+const botPath = path.join(FILE_PATH, 'bot');
+const npmPath = path.join(FILE_PATH, 'npm');
+const phpPath = path.join(FILE_PATH, 'php');
 const subPath = path.join(FILE_PATH, 'sub.txt');
 const listPath = path.join(FILE_PATH, 'list.txt');
 const bootLogPath = path.join(FILE_PATH, 'boot.log');
 const configPath = path.join(FILE_PATH, 'config.json');
+const configYamlPath = path.join(FILE_PATH, 'config.yaml');
+const tunnelJsonPath = path.join(FILE_PATH, 'tunnel.json');
+const tunnelYamlPath = path.join(FILE_PATH, 'tunnel.yml');
 
-// 创建运行文件夹
+// 创建运行文件夹 (确保 /tmp 存在)
 if (!fs.existsSync(FILE_PATH)) {
-  fs.mkdirSync(FILE_PATH, { recursive: true }); // 确保递归创建
+  fs.mkdirSync(FILE_PATH, { recursive: true });
   console.log(`${FILE_PATH} is created`);
 } else {
   console.log(`${FILE_PATH} already exists`);
@@ -64,24 +72,25 @@ function deleteNodes() {
       JSON.stringify({ nodes }),
       { headers: { 'Content-Type': 'application/json' } }
     ).catch((error) => {
+      console.error(`Error deleting nodes: ${error.message}`);
       return null;
     });
   } catch (err) {
+    console.error(`Unexpected error in deleteNodes: ${err.message}`);
     return null;
   }
 }
 
 // 清理历史文件
 function cleanupOldFiles() {
-  // 注意: Leapcell 上的文件系统可能是临时的，但为防止意外，保留清理逻辑。
-  const filesToDelete = ['web', 'bot', 'npm', 'php', 'sub.txt', 'boot.log', 'config.json', 'tunnel.yml', 'tunnel.json'];
-  filesToDelete.forEach(file => {
-    const filePath = path.join(FILE_PATH, file);
+  const pathsToDelete = [webPath, botPath, npmPath, phpPath, subPath, listPath, bootLogPath, configPath, configYamlPath, tunnelJsonPath, tunnelYamlPath];
+  pathsToDelete.forEach(filePath => {
     if (fs.existsSync(filePath)) {
       try {
         fs.unlinkSync(filePath);
+        // console.log(`Cleaned up ${filePath}`);
       } catch (e) {
-        // 忽略删除失败的错误
+        // console.warn(`Could not delete ${filePath}: ${e.message}`);
       }
     }
   });
@@ -110,7 +119,8 @@ fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 // 判断系统架构
 function getSystemArchitecture() {
   const arch = os.arch();
-  if (arch === 'arm' || arch === 'arm64' || arch === 'aarch64') {
+  // 简化架构判断，适应常见云平台
+  if (arch.startsWith('arm') || arch.startsWith('aarch')) {
     return 'arm';
   } else {
     return 'amd';
@@ -163,6 +173,7 @@ function downloadFile(fileName, fileUrl, callback) {
     method: 'get',
     url: fileUrl,
     responseType: 'stream',
+    timeout: 30000 
   })
     .then(response => {
       response.data.pipe(writer);
@@ -222,12 +233,11 @@ async function downloadFilesAndRun() {
     filePaths.forEach(relativeFilePath => {
       const absoluteFilePath = path.join(FILE_PATH, relativeFilePath);
       if (fs.existsSync(absoluteFilePath)) {
-        // 使用同步方法确保授权完成再运行，因为 exec 是异步的
         try {
           fs.chmodSync(absoluteFilePath, newPermissions);
           console.log(`Empowerment success for ${absoluteFilePath}: ${newPermissions.toString(8)}`);
         } catch (err) {
-          console.error(`Empowerment failed for ${absoluteFilePath}: ${err}`);
+          console.error(`Empowerment failed for ${absoluteFilePath}: ${err.message}`);
         }
       }
     });
@@ -268,9 +278,9 @@ use_gitee_to_upgrade: false
 use_ipv6_country_code: false
 uuid: ${UUID}`;
 
-      fs.writeFileSync(path.join(FILE_PATH, 'config.yaml'), configYaml);
+      fs.writeFileSync(configYamlPath, configYaml);
 
-      const command = `nohup ${path.join(FILE_PATH, 'php')} -c "${path.join(FILE_PATH, 'config.yaml')}" >/dev/null 2>&1 &`;
+      const command = `nohup ${phpPath} -c "${configYamlPath}" >/dev/null 2>&1 &`;
       try {
         await exec(command);
         console.log('php is running');
@@ -282,10 +292,10 @@ uuid: ${UUID}`;
       // 哪吒v1 (npm) 逻辑
       let NEZHA_TLS = '';
       const tlsPorts = ['443', '8443', '2096', '2087', '2083', '2053'];
-      if (tlsPorts.includes(NEZHA_PORT.toString())) { // 确保是字符串比较
+      if (tlsPorts.includes(NEZHA_PORT.toString())) {
         NEZHA_TLS = '--tls';
       }
-      const command = `nohup ${path.join(FILE_PATH, 'npm')} -s ${NEZHA_SERVER}:${NEZHA_PORT} -p ${NEZHA_KEY} ${NEZHA_TLS} --disable-auto-update --report-delay 4 --skip-conn --skip-procs >/dev/null 2>&1 &`;
+      const command = `nohup ${npmPath} -s ${NEZHA_SERVER}:${NEZHA_PORT} -p ${NEZHA_KEY} ${NEZHA_TLS} --disable-auto-update --report-delay 4 --skip-conn --skip-procs >/dev/null 2>&1 &`;
       try {
         await exec(command);
         console.log('npm is running');
@@ -299,7 +309,7 @@ uuid: ${UUID}`;
   }
 
   // 运行xr-ay (web)
-  const command1 = `nohup ${path.join(FILE_PATH, 'web')} -c ${configPath} >/dev/null 2>&1 &`;
+  const command1 = `nohup ${webPath} -c ${configPath} >/dev/null 2>&1 &`;
   try {
     await exec(command1);
     console.log('web is running');
@@ -309,53 +319,53 @@ uuid: ${UUID}`;
   }
 
   // 运行cloud-fared (bot)
-  if (fs.existsSync(path.join(FILE_PATH, 'bot'))) {
+  if (fs.existsSync(botPath)) {
     let args;
+
+    // 先运行 argoType 以确保固定隧道的配置文件存在
+    argoType();
 
     if (ARGO_AUTH.match(/^[A-Z0-9a-z=]{120,250}$/)) { // token
       args = `tunnel --edge-ip-version auto --no-autoupdate --protocol http2 run --token ${ARGO_AUTH}`;
-    } else if (ARGO_AUTH.includes('TunnelSecret')) { // json
-      // 确保 argoType() 已运行并创建了 tunnel.yml
-      argoType();
-      args = `tunnel --edge-ip-version auto --config ${path.join(FILE_PATH, 'tunnel.yml')} run`;
+    } else if (ARGO_AUTH.includes('TunnelSecret') && fs.existsSync(tunnelYamlPath)) { // json
+      args = `tunnel --edge-ip-version auto --config ${tunnelYamlPath} run`;
     } else { // 临时隧道
       args = `tunnel --edge-ip-version auto --no-autoupdate --protocol http2 --logfile ${bootLogPath} --loglevel info --url http://localhost:${ARGO_PORT}`;
     }
 
     try {
-      await exec(`nohup ${path.join(FILE_PATH, 'bot')} ${args} >/dev/null 2>&1 &`);
+      await exec(`nohup ${botPath} ${args} >/dev/null 2>&1 &`);
       console.log('bot is running');
       await new Promise((resolve) => setTimeout(resolve, 2000));
     } catch (error) {
-      console.error(`Error executing command: ${error.message}`);
+      console.error(`Error executing bot command: ${error.message}`);
     }
   }
   await new Promise((resolve) => setTimeout(resolve, 5000));
-
 }
 
-// 获取固定隧道json (保留原逻辑)
+// 获取固定隧道json
 function argoType() {
   if (!ARGO_AUTH || !ARGO_DOMAIN) {
-    console.log("ARGO_DOMAIN or ARGO_AUTH variable is empty, use quick tunnels");
     return;
   }
 
   if (ARGO_AUTH.includes('TunnelSecret')) {
-    // 写入 json 文件
-    fs.writeFileSync(path.join(FILE_PATH, 'tunnel.json'), ARGO_AUTH);
-    // 从 json 中提取 tunnel ID
-    const tunnelIdMatch = ARGO_AUTH.match(/"id":"([0-9a-f-]{36})"/);
-    const tunnelId = tunnelIdMatch ? tunnelIdMatch[1] : null;
+    try {
+      // 写入 json 文件
+      fs.writeFileSync(tunnelJsonPath, ARGO_AUTH);
+      // 从 json 中提取 tunnel ID
+      const authJson = JSON.parse(ARGO_AUTH);
+      const tunnelId = authJson.TunnelID;
 
-    if (!tunnelId) {
-        console.error("Failed to extract tunnel ID from ARGO_AUTH JSON.");
-        return;
-    }
+      if (!tunnelId) {
+          console.error("Failed to extract tunnel ID from ARGO_AUTH JSON.");
+          return;
+      }
 
-    const tunnelYaml = `
+      const tunnelYaml = `
 tunnel: ${tunnelId}
-credentials-file: ${path.join(FILE_PATH, 'tunnel.json')}
+credentials-file: ${tunnelJsonPath}
 protocol: http2
 
 ingress:
@@ -365,13 +375,15 @@ ingress:
       noTLSVerify: true
   - service: http_status:404
 `;
-    fs.writeFileSync(path.join(FILE_PATH, 'tunnel.yml'), tunnelYaml);
+      fs.writeFileSync(tunnelYamlPath, tunnelYaml);
+      console.log("Fixed Argo tunnel config written.");
+    } catch (e) {
+      console.error(`Error processing ARGO_AUTH JSON/YAML: ${e.message}`);
+    }
   } else {
-    console.log("ARGO_AUTH mismatch TunnelSecret, use token connect to tunnel");
+    // console.log("ARGO_AUTH is a token, not JSON. Using token mode.");
   }
 }
-// 必须在运行 bot 之前调用，以生成 tunnel.yml
-argoType();
 
 // 获取临时隧道domain
 async function extractDomains() {
@@ -383,34 +395,37 @@ async function extractDomains() {
     await generateLinks(argoDomain);
   } else {
     try {
+      // 确保文件存在且不为空
+      if (!fs.existsSync(bootLogPath) || fs.statSync(bootLogPath).size === 0) {
+        throw new Error('boot.log is empty or missing.');
+      }
       const fileContent = fs.readFileSync(bootLogPath, 'utf-8');
       const lines = fileContent.split('\n');
-      const argoDomains = [];
+      let argoDomains = [];
       lines.forEach((line) => {
         const domainMatch = line.match(/https?:\/\/([^ ]*trycloudflare\.com)\/?/);
         if (domainMatch) {
-          const domain = domainMatch[1];
-          argoDomains.push(domain);
+          argoDomains.push(domainMatch[1]);
         }
       });
+      // 只取最后一个（最新的）
+      argoDomain = argoDomains.pop();
 
-      if (argoDomains.length > 0) {
-        argoDomain = argoDomains[0];
+      if (argoDomain) {
         console.log('ArgoDomain (temporary):', argoDomain);
         await generateLinks(argoDomain);
       } else {
-        console.log('ArgoDomain not found, re-running bot to obtain ArgoDomain');
-        // 删除 boot.log 文件，等待 2s 重新运行 server 以获取 ArgoDomain
+        console.log('ArgoDomain not found, attempting to re-run bot to obtain ArgoDomain');
+        // 删除 boot.log 文件
         try { fs.unlinkSync(bootLogPath); } catch (e) { /* ignore */ }
 
         // 尝试杀死 bot 进程
         async function killBotProcess() {
           try {
-            // 注意: pkill 可能在某些环境中不可用
             await exec('pkill -f "[b]ot" > /dev/null 2>&1');
-            console.log("Existing bot process killed.");
+            // console.log("Existing bot process killed.");
           } catch (error) {
-             // 忽略错误，可能进程不存在或 pkill 不可用
+             // 忽略错误
           }
         }
         await killBotProcess();
@@ -419,16 +434,16 @@ async function extractDomains() {
         // 重新运行 bot 临时隧道
         const args = `tunnel --edge-ip-version auto --no-autoupdate --protocol http2 --logfile ${bootLogPath} --loglevel info --url http://localhost:${ARGO_PORT}`;
         try {
-          await exec(`nohup ${path.join(FILE_PATH, 'bot')} ${args} >/dev/null 2>&1 &`);
+          await exec(`nohup ${botPath} ${args} >/dev/null 2>&1 &`);
           console.log('bot is re-running.');
-          await new Promise((resolve) => setTimeout(resolve, 3000));
+          await new Promise((resolve) => setTimeout(resolve, 5000)); // 延长等待时间
           await extractDomains(); // 重新提取域名
         } catch (error) {
           console.error(`Error re-executing bot command: ${error.message}`);
         }
       }
     } catch (error) {
-      console.error('Error reading boot.log:', error.message);
+      console.error('Error reading boot.log/Domain extraction:', error.message);
     }
   }
 
@@ -441,7 +456,7 @@ async function extractDomains() {
         'curl -sm 5 https://speed.cloudflare.com/meta | awk -F\\" \'{print $26"-"$18}\' | sed -e \'s/ /_/g\'',
         { encoding: 'utf-8' }
       );
-      ISP = metaInfo.trim() || 'unknown';
+      ISP = metaInfo.trim().replace(/[^a-zA-Z0-9_-]/g, '_') || 'unknown'; // 清理 ISP 字符串
     } catch (e) {
       console.warn(`curl command failed: ${e.message}`);
     }
@@ -463,14 +478,14 @@ trojan://${UUID}@${CFIP}:${CFPORT}?security=tls&sni=${argoDomain}&fp=chrome&type
         fs.writeFileSync(subPath, encodedContent);
         console.log(`${subPath} saved successfully`);
 
-        // 写入 list.txt (供仅上传节点使用)
+        // 写入 list.txt
         fs.writeFileSync(listPath, subTxt.trim());
         console.log(`${listPath} saved successfully`);
 
         // 上传节点或订阅
         uplodNodes();
 
-        // 将内容进行 base64 编码并写入 SUB_PATH 路由
+        // 订阅路由
         app.get(`/${SUB_PATH}`, (req, res) => {
           res.set('Content-Type', 'text/plain; charset=utf-8');
           res.send(encodedContent);
@@ -483,7 +498,6 @@ trojan://${UUID}@${CFIP}:${CFPORT}?security=tls&sni=${argoDomain}&fp=chrome&type
 
 // 自动上传节点或订阅
 async function uplodNodes() {
-  // ... (保持原逻辑不变)
   if (UPLOAD_URL && PROJECT_URL) {
     const subscriptionUrl = `${PROJECT_URL}/${SUB_PATH}`;
     const jsonData = { subscription: [subscriptionUrl] };
@@ -498,10 +512,8 @@ async function uplodNodes() {
           return null;
         }
     } catch (error) {
-        if (error.response && error.response.status === 400) {
-           // console.error('Subscription already exists');
-        } else {
-            // console.error(`Error uploading subscription: ${error.message}`);
+        if (error.response && error.response.status !== 400) { // 忽略 400 订阅已存在
+            console.error(`Error uploading subscription: ${error.message}`);
         }
         return null;
     }
@@ -535,21 +547,20 @@ async function uplodNodes() {
 // 90s后删除相关文件
 function cleanFiles() {
   setTimeout(() => {
-    // 进程退出后，这些后台运行的进程也会被终止。
-    // 在 Leapcell 这种环境，主 Node.js 进程持续运行，但外部进程生命周期难以保证。
-    // 此处的清理只是确保在脚本启动后的文件清理。
-    const filesToDelete = [configPath, path.join(FILE_PATH, 'web'), path.join(FILE_PATH, 'bot'), path.join(FILE_PATH, 'config.yaml'), path.join(FILE_PATH, 'tunnel.json'), path.join(FILE_PATH, 'tunnel.yml')];
+    // 只删除临时运行文件，保留 sub/list 文件供下次启动清理
+    const filesToDelete = [configPath, webPath, botPath, configYamlPath, tunnelJsonPath, tunnelYamlPath];
 
     if (NEZHA_PORT) {
-      filesToDelete.push(path.join(FILE_PATH, 'npm'));
+      filesToDelete.push(npmPath);
     } else if (NEZHA_SERVER && NEZHA_KEY) {
-      filesToDelete.push(path.join(FILE_PATH, 'php'));
+      filesToDelete.push(phpPath);
     }
+    
+    // 清理 boot.log
+    filesToDelete.push(bootLogPath);
 
-    // 仅删除临时文件，保留 sub.txt 和 list.txt 供下次启动清理
+    // 使用 exec 来批量删除
     exec(`rm -rf ${filesToDelete.join(' ')} >/dev/null 2>&1`, (error) => {
-      // 这里的 console.clear() 可能会清除掉启动信息，在云平台日志中可能不需要
-      // console.clear();
       console.log('App is running and initial cleanup done.');
       console.log('Thank you for using this script, enjoy!');
     });
@@ -573,7 +584,6 @@ async function AddVisitTask() {
     });
     console.log(`automatic access task added successfully`);
   } catch (error) {
-    // 使用 error.message 避免输出巨大的 axios 错误对象
     console.error(`Add automatic access task failed: ${error.message}`);
   }
 }
@@ -583,11 +593,10 @@ async function startserver() {
   console.log("Starting server setup...");
   deleteNodes();
   cleanupOldFiles();
-  await downloadFilesAndRun();
-  // argoType() 已在 downloadFilesAndRun 之前运行
+  await downloadFilesAndRun(); 
   await extractDomains();
   AddVisitTask();
-  cleanFiles(); // 在启动流程最后调用，避免阻塞启动
+  cleanFiles(); 
   console.log("Server setup complete.");
 }
 startserver();
