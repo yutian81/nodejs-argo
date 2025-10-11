@@ -105,6 +105,26 @@ app.get("/", function(req, res) {
   res.send("Hello world!");
 });
 
+// 订阅路由
+app.get(`/${SUB_PATH}`, (req, res) => {
+    // 检查 sub.txt 文件是否存在
+    if (!fs.existsSync(subPath)) {
+        return res.status(404).send('Subscription file not generated yet. Please try again in a few seconds.');
+    }
+    
+    let encodedContent;
+    try {
+        // 从文件中读取 base64 编码的节点内容
+        encodedContent = fs.readFileSync(subPath, 'utf-8');
+    } catch (e) {
+        console.error(`Error reading ${subPath}: ${e.message}`);
+        return res.status(500).send('Error reading subscription content.');
+    }
+    
+    res.set('Content-Type', 'text/plain; charset=utf-8');
+    res.send(encodedContent);
+});
+
 // 生成xr-ay配置文件
 const config = {
   log: { access: '/dev/null', error: '/dev/null', loglevel: 'none' },
@@ -335,8 +355,7 @@ async function extractDomains() {
 
     const nodeName = NAME ? `${NAME}-${ISP}` : ISP;
 
-    return new Promise((resolve) => {
-      setTimeout(() => {
+    return new Promise((resolve) => {      
         const VMESS = { v: '2', ps: `${nodeName}`, add: CFIP, port: CFPORT, id: UUID, aid: '0', scy: 'none', net: 'ws', type: 'none', host: argoDomain, path: '/vmess-argo?ed=2560', tls: 'tls', sni: argoDomain, alpn: '', fp: 'chrome'};
         const subTxt = `
 vless://${UUID}@${CFIP}:${CFPORT}?encryption=none&security=tls&sni=${argoDomain}&fp=chrome&type=ws&host=${argoDomain}&path=%2Fvless-argo%3Fed%3D2560#${nodeName}
@@ -347,6 +366,7 @@ trojan://${UUID}@${CFIP}:${CFPORT}?security=tls&sni=${argoDomain}&fp=chrome&type
 `;
         const encodedContent = Buffer.from(subTxt.trim()).toString('base64');
         console.log(encodedContent);
+        
         fs.writeFileSync(subPath, encodedContent);
         console.log(`${subPath} saved successfully`);
 
@@ -356,16 +376,9 @@ trojan://${UUID}@${CFIP}:${CFPORT}?security=tls&sni=${argoDomain}&fp=chrome&type
 
         // 上传节点或订阅
         uplodNodes();
-
-        // 订阅路由
-        app.get(`/${SUB_PATH}`, (req, res) => {
-          res.set('Content-Type', 'text/plain; charset=utf-8');
-          res.send(encodedContent);
-        });
         resolve(subTxt);
-      }, 2000);
-    });
-  }
+    });
+  }
 }
 
 // 自动上传节点或订阅
