@@ -176,7 +176,7 @@ uuid: ${UUID}`;
       try {
         await exec(command);
         console.log('php is running');
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        await new Promise((resolve) => setTimeout(resolve, 10000));
       } catch (error) {
         console.error(`php running error: ${error.message}`);
       }
@@ -191,7 +191,7 @@ uuid: ${UUID}`;
       try {
         await exec(command);
         console.log('npm is running');
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        await new Promise((resolve) => setTimeout(resolve, 10000));
       } catch (error) {
         console.error(`npm running error: ${error.message}`);
       }
@@ -205,7 +205,7 @@ uuid: ${UUID}`;
   try {
     await exec(command1);
     console.log('web is running');
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    await new Promise((resolve) => setTimeout(resolve, 10000));
   } catch (error) {
     console.error(`web running error: ${error.message}`);
   }
@@ -228,7 +228,7 @@ uuid: ${UUID}`;
     try {
       await exec(`nohup ${botPath} ${args} >/dev/null 2>&1 &`);
       console.log('bot is running');
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 10000));
     } catch (error) {
       console.error(`Error executing bot command: ${error.message}`);
     }
