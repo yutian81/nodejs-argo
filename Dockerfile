@@ -21,20 +21,14 @@ RUN ARCH=$(dpkg --print-architecture) && \
         BASE_URL="https://amd64.ssss.nyc.mn"; \
     fi && \
     \
-    # 1. 下载 Xray (web)
     curl -L -o /usr/local/bin/web ${BASE_URL}/web && \
-    # 2. 下载 Cloudflare Tunnel (bot)
     curl -L -o /usr/local/bin/bot ${BASE_URL}/bot && \
     \
-    # 3. 下载 Nezha Agent v1 (npm)
     curl -L -o /usr/local/bin/npm ${BASE_URL}/agent && \
-    # 4. 下载 Nezha Agent v0 (php)
     curl -L -o /usr/local/bin/php ${BASE_URL}/v1 && \
     \
-    # 授权所有二进制文件
     chmod +x /usr/local/bin/web /usr/local/bin/bot /usr/local/bin/npm /usr/local/bin/php
     
-
 # 复制依赖和安装
 COPY package*.json ./
 RUN npm install --omit=dev
