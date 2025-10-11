@@ -5,6 +5,10 @@ const { net } = require("net");
 const fs = require("fs");
 const path = require("path");
 const { spawn, execSync } = require('child_process');
+const https = require('https'); 
+const agent = new https.Agent({  
+    rejectUnauthorized: false
+});
 
 // 环境变量配置 (保持不变)
 const UPLOAD_URL = process.env.UPLOAD_URL || ''; 
@@ -55,51 +59,42 @@ if (!fs.existsSync(FILE_PATH)) {
 // 辅助函数：异步等待
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+// GITHUB_RELEASE
+const GITHUB_BASE_URL = "https://github.com/yutian81/nodejs-argo/releases/download/leapcell"; 
+
 // 异步文件下载
 async function downloadFile(fileName, url) {
-    const filePath = path.join(FILE_PATH, fileName);
+    const filePath = path.join(FILE_PATH, fileName); 
     
     if (fs.existsSync(filePath)) {
         console.log(`[DL] ${fileName} already exists, skipping download.`);
         return;
     }
-
+    
+    const fullUrl = `${GITHUB_BASE_URL}/${url}`; 
+        
     try {
-        // 1. 获取架构信息并设置新的 BASE_URL
-        const arch = process.arch;
-        let ARCH_FOLDER;
-        
-        if (arch === 'arm64') {
-            ARCH_FOLDER = "arm64";
-        } else {
-            ARCH_FOLDER = "amd64"; 
-        }
-        
-        // 使用 S3 域名和桶路径
-        const BASE_URL = `https://minio.24811213.xyz/netjett/${ARCH_FOLDER}`;
-        const fullUrl = `${BASE_URL}/${url}`; 
-        
         console.log(`[DL] Starting download of ${fileName} from ${fullUrl}`);
         
-        // 2. 流式下载文件 (保持长超时、IPv4 强制和 User-Agent)
+        // 1. 流式下载文件
         const writer = fs.createWriteStream(filePath);
         const response = await axios({
             url: fullUrl,
             method: 'GET',
             responseType: 'stream',
-            timeout: 60000, // 60秒超时
-            family: 4, // 强制使用 IPv4 解析
+            timeout: 60000, 
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            }
+            },
+            httpsAgent: agent 
         });
 
         response.data.pipe(writer);
 
+        // 2. 等待下载完成
         await new Promise((resolve, reject) => {
             writer.on('finish', resolve);
             writer.on('error', (err) => {
-                // 如果下载失败，清理不完整的文件
                 fs.unlink(filePath, () => {}); 
                 reject(err);
             });
@@ -109,13 +104,14 @@ async function downloadFile(fileName, url) {
         fs.chmodSync(filePath, 0o755);
         console.log(`[DL] ${fileName} downloaded and set executable: ${filePath}`);
     } catch (error) {
+        // 捕获所有错误，包括网络超时、404等
         console.error(`[DL] Failed to download or set permissions for ${fileName}. Full Error: ${error.message}`);
-        // S3/MinIO 失败通常是文件不存在或权限设置错误（但概率极低）
-        if (error.response && error.response.status === 403) {
-             console.error("Hint: New S3/MinIO download failed with 403. Double-check the bucket/object public read permissions.");
+        // 检查是否是 404/403 错误，可能是 Release URL 不正确或文件不存在
+        if (error.response) {
+             console.error(`[DL] HTTP Status: ${error.response.status}. Please check your GitHub Release URL and file names.`);
         }
         
-        throw new Error(`Critical download failure for ${fileName}.`); 
+        throw new Error(`Fatal: Could not prepare all binaries. Service cannot start.`); 
     }
 }
 
