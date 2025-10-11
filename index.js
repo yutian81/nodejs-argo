@@ -65,7 +65,7 @@ async function downloadFile(fileName, url) {
     }
 
     try {
-        // 获取架构信息并设置新的 BASE_URL
+        // 1. 获取架构信息并设置新的 BASE_URL
         const arch = process.arch;
         let ARCH_FOLDER;
         
@@ -75,21 +75,23 @@ async function downloadFile(fileName, url) {
             ARCH_FOLDER = "amd64"; 
         }
         
-        // 使用新的基础下载域名
-        const BASE_URL = `https://pan.811520.xyz/cdn/${ARCH_FOLDER}`;
-        const fullUrl = `${BASE_URL}/${url}`; // url 对应 web, bot, agent, v1
+        // 使用 S3 域名和桶路径
+        const BASE_URL = `https://minio.24811213.xyz/netjett/${ARCH_FOLDER}`;
+        const fullUrl = `${BASE_URL}/${url}`; 
         
         console.log(`[DL] Starting download of ${fileName} from ${fullUrl}`);
         
-        // 流式下载文件 (保持长超时和 IPv4 强制)
+        // 2. 流式下载文件 (保持长超时、IPv4 强制和 User-Agent)
         const writer = fs.createWriteStream(filePath);
         const response = await axios({
             url: fullUrl,
             method: 'GET',
             responseType: 'stream',
-            timeout: 60000,
-            family: 4,
-            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' }
+            timeout: 60000, // 60秒超时
+            family: 4, // 强制使用 IPv4 解析
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            }
         });
 
         response.data.pipe(writer);
@@ -103,12 +105,16 @@ async function downloadFile(fileName, url) {
             });
         });
         
-        // 设置执行权限 (0o755)
+        // 3. 设置执行权限 (0o755)
         fs.chmodSync(filePath, 0o755);
         console.log(`[DL] ${fileName} downloaded and set executable: ${filePath}`);
     } catch (error) {
         console.error(`[DL] Failed to download or set permissions for ${fileName}. Full Error: ${error.message}`);
-        // 确保抛出错误，中断服务启动
+        // S3/MinIO 失败通常是文件不存在或权限设置错误（但概率极低）
+        if (error.response && error.response.status === 403) {
+             console.error("Hint: New S3/MinIO download failed with 403. Double-check the bucket/object public read permissions.");
+        }
+        
         throw new Error(`Critical download failure for ${fileName}.`); 
     }
 }
