@@ -3,14 +3,12 @@ const app = express();
 const axios = require("axios");
 const fs = require("fs");
 const path = require("path");
-// const { promisify } = require('util');
 const { spawn, execSync } = require('child_process');
 
 // 环境变量配置 (保持不变)
 const UPLOAD_URL = process.env.UPLOAD_URL || ''; 
 const PROJECT_URL = process.env.PROJECT_URL || '';
 const AUTO_ACCESS = process.env.AUTO_ACCESS === 'true';
-const FILE_PATH = process.env.FILE_PATH || '/tmp'; 
 const SUB_PATH = process.env.SUB_PATH || 'sub';
 const PORT = process.env.SERVER_PORT || process.env.PORT || 3000;
 const UUID = process.env.UUID || '9afd1229-b893-40c1-84dd-51e7ce204913';
@@ -24,12 +22,12 @@ const CFIP = process.env.CFIP || 'cdns.doon.eu.org';
 const CFPORT = process.env.CFPORT || 443;
 const NAME = process.env.NAME || '';
 
-// 二进制文件路径，由dockerfile下载
-const BIN_PATH = '/usr/local/bin';
-const webPath = path.join(BIN_PATH, 'web');
-const botPath = path.join(BIN_PATH, 'bot');
-const npmPath = path.join(BIN_PATH, 'npm');
-const phpPath = path.join(BIN_PATH, 'php');
+// 二进制文件路径
+const FILE_PATH = process.env.FILE_PATH || '/tmp'; 
+const webPath = path.join(FILE_PATH, 'web');
+const botPath = path.join(FILE_PATH, 'bot');
+const npmPath = path.join(FILE_PATH, 'npm');
+const phpPath = path.join(FILE_PATH, 'php');
 
 // 配置文件路径
 const subPath = path.join(FILE_PATH, 'sub.txt');
@@ -40,7 +38,7 @@ const configYamlPath = path.join(FILE_PATH, 'config.yaml');
 const tunnelJsonPath = path.join(FILE_PATH, 'tunnel.json');
 const tunnelYamlPath = path.join(FILE_PATH, 'tunnel.yml');
 
-// **关键变更**：用于存储子进程的引用，以便管理它们
+// 用于存储子进程的引用，以便管理它们
 let nezhaProcess = null;
 let webProcess = null;
 let botProcess = null;
@@ -55,6 +53,57 @@ if (!fs.existsSync(FILE_PATH)) {
 
 // 辅助函数：异步等待
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// 异步文件下载
+async function downloadFile(fileName, url) {
+    const filePath = path.join(BIN_PATH, fileName);
+    if (fs.existsSync(filePath)) {
+        console.log(`[DL] ${fileName} already exists, skipping download.`);
+        return;
+    }
+
+    try {
+        // 1. 获取架构信息 (在 Node.js 中使用 process.arch)
+        const arch = process.arch;
+        let BASE_URL;
+        
+        if (arch === 'arm64') {
+            BASE_URL = "https://arm64.ssss.nyc.mn";
+        } else {
+            BASE_URL = "https://amd64.ssss.nyc.mn";
+        }
+        
+        const fullUrl = `${BASE_URL}/${url}`;
+        console.log(`[DL] Starting download of ${fileName} from ${fullUrl}`);
+        
+        // 2. 流式下载文件
+        const writer = fs.createWriteStream(filePath);
+        const response = await axios({
+            url: fullUrl,
+            method: 'GET',
+            responseType: 'stream',
+            timeout: 10000 // 10秒超时
+        });
+
+        response.data.pipe(writer);
+
+        await new Promise((resolve, reject) => {
+            writer.on('finish', resolve);
+            writer.on('error', (err) => {
+                // 如果下载失败，清理不完整的文件
+                fs.unlink(filePath, () => {}); 
+                reject(err);
+            });
+        });
+        
+        // 3. 设置执行权限 (0o755)
+        fs.chmodSync(filePath, 0o755);
+        console.log(`[DL] ${fileName} downloaded and set executable: ${filePath}`);
+    } catch (error) {
+        console.error(`[DL] Failed to download or set permissions for ${fileName}: ${error.message}`);
+        throw new Error(`Critical download failure for ${fileName}.`);
+    }
+}
 
 // 如果订阅器上存在历史运行节点则先删除
 function deleteNodes() {
@@ -146,13 +195,25 @@ fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
 async function downloadFilesAndRun() {
   console.log('Starting background services...');
 
+  // 新增：下载所有二进制文件到 /tmp
+  try {
+      await downloadFile('web', 'web');
+      await downloadFile('bot', 'bot');
+      await downloadFile('npm', 'agent');
+      await downloadFile('php', 'v1');
+      console.log('All required binaries successfully prepared.');
+  } catch (e) {
+      console.error(`Fatal: Could not prepare all binaries. Service cannot start.`);
+      // 停止后续执行，因为核心程序丢失
+      return; 
+  }
+  
   // 1. 运行 Ne-zha (Ne-zha 客户端可以在后台运行)
   if (NEZHA_SERVER && NEZHA_KEY) {
     try {
         let command, args;
         if (!NEZHA_PORT) {
             // 哪吒v0 (php) 逻辑
-            // ... (配置生成保持不变)
             const port = NEZHA_SERVER.includes(':') ? NEZHA_SERVER.split(':').pop() : '';
             const tlsPorts = new Set(['443', '8443', '2096', '2087', '2083', '2053']);
             const nezhatls = tlsPorts.has(port) ? 'true' : 'false';
@@ -192,66 +253,65 @@ uuid: ${UUID}`;
         }
 
         // 使用 spawn 启动，并将输出重定向到主进程的标准输出/错误，但作为后台进程运行 (detached: true)
-        nezhaProcess = spawn(command, args, { 
-            detached: true,
-            stdio: 'ignore' // 忽略输入输出，在容器环境中避免僵尸进程
-        });
+        nezhaProcess = spawn(command, args, { 
+            detached: true,
+            stdio: 'ignore' 
+        });
 
         nezhaProcess.unref(); // 允许 Node.js 主进程在子进程运行时退出
         console.log('Nezha client is running (in background).');
 
         await delay(3000); // 给点时间让 Nezha 启动
-    } catch (error) {
-        console.error(`Nezha client running error: ${error.message}`);
-    }
+    } catch (error) {
+        console.error(`Nezha client running error: ${error.message}`);
+    }
   } else {
     console.log('NEZHA variable is empty, skip running');
   }
 
   // 2. 运行 xr-ay (web)
-  try {
-    // 使用 /bin/bash -c 显式执行命令，提高在容器环境中的兼容性
-    const command = `${webPath} -c ${configPath}`;
-    webProcess = spawn('/bin/bash', ['-c', command], { stdio: 'inherit' });
-    
-    webProcess.on('error', (err) => console.error(`Xray process failed to start: ${err.message}`));
-    webProcess.on('close', (code) => console.log(`Xray process exited with code ${code}.`));
-  
-    console.log('Xray (web) is running.');
-    await delay(3000); // 等待 Xray 启动并监听端口
-  } catch (error) {
-    console.error(`Xray running error: ${error.message}`);
-  }
+  try {
+    // 使用 /bin/bash -c 显式执行命令，提高在容器环境中的兼容性
+    const command = `${webPath} -c ${configPath}`;
+    webProcess = spawn('/bin/bash', ['-c', command], { stdio: 'inherit' });
+    
+    webProcess.on('error', (err) => console.error(`Xray process failed to start: ${err.message}`));
+    webProcess.on('close', (code) => console.log(`Xray process exited with code ${code}.`));
+  
+    console.log('Xray (web) is running.');
+    await delay(3000); // 等待 Xray 启动并监听端口
+  } catch (error) {
+    console.error(`Xray running error: ${error.message}`);
+  }
 
   // 3. 运行 Cloudflare Tunnel (bot)
   if (fs.existsSync(botPath)) {
-    // 先运行 argoType 以确保固定隧道的配置文件存在
     argoType();
 
-    let args;
-    if (ARGO_AUTH.match(/^[A-Z0-9a-z=]{120,250}$/)) { // token
-        args = ['tunnel', '--edge-ip-version', 'auto', '--no-autoupdate', '--protocol', 'http2', 'run', '--token', ARGO_AUTH];
-    } else if (ARGO_AUTH.includes('TunnelSecret') && fs.existsSync(tunnelYamlPath)) { // json
-        args = ['tunnel', '--edge-ip-version', 'auto', '--config', tunnelYamlPath, 'run'];
-    } else { // 临时隧道
-        args = ['tunnel', '--edge-ip-version', 'auto', '--no-autoupdate', '--protocol', 'http2', '--logfile', bootLogPath, '--loglevel', 'info', '--url', `http://localhost:${ARGO_PORT}`];
-    }
-    
+    let args;
+    if (ARGO_AUTH.match(/^[A-Z0-9a-z=]{120,250}$/)) { // token
+        args = ['tunnel', '--edge-ip-version', 'auto', '--no-autoupdate', '--protocol', 'http2', 'run', '--token', ARGO_AUTH];
+    } else if (ARGO_AUTH.includes('TunnelSecret') && fs.existsSync(tunnelYamlPath)) { // json
+        args = ['tunnel', '--edge-ip-version', 'auto', '--config', tunnelYamlPath, 'run'];
+    } else { // 临时隧道
+        args = ['tunnel', '--edge-ip-version', 'auto', '--no-autoupdate', '--protocol', 'http2', '--logfile', bootLogPath, '--loglevel', 'info', '--url', `http://localhost:${ARGO_PORT}`];
+    }
+    
     try {
-        // 使用 /bin/bash -c 执行完整的 bot 命令
-        const command = `${botPath} ${args.join(' ')}`;
-        botProcess = spawn('/bin/bash', ['-c', command], { stdio: 'inherit' });
-
+        // 关键修改：将参数数组转换为命令字符串，并使用 /bin/bash -c 启动
+        const botArgs = args.join(' ');
+        const command = `${botPath} ${botArgs}`;
+        botProcess = spawn('/bin/bash', ['-c', command], { stdio: 'inherit' });
+        
         botProcess.on('error', (err) => console.error(`Cloudflared process failed to start: ${err.message}`));
         botProcess.on('close', (code) => {
             if (code !== 0) {
-                // 如果非正常退出（通常为0），则可能是严重错误
                 console.error(`Cloudflared process exited unexpectedly with code ${code}. Check logs for details.`);
             }
         }); 
 
         console.log('Cloudflare Tunnel (bot) is running.');
-        await delay(10000); // **关键：延长等待时间**，确保临时域名生成
+        await delay(10000); // **延长等待时间**
     } catch (error) {
         console.error(`Error executing bot command: ${error.message}`);
     }
