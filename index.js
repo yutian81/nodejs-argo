@@ -63,45 +63,28 @@ async function downloadFile(fileName, url) {
     }
 
     try {
-        // 1. 获取架构信息 (在 Node.js 中使用 process.arch)
         const arch = process.arch;
-        let BASE_URL;
-        
-        if (arch === 'arm64') {
-            BASE_URL = "https://arm64.ssss.nyc.mn";
-        } else {
-            BASE_URL = "https://amd64.ssss.nyc.mn";
-        }
-        
+        let BASE_URL = (arch === 'arm64') ? "https://arm64.ssss.nyc.mn" : "https://amd64.ssss.nyc.mn";
         const fullUrl = `${BASE_URL}/${url}`;
-        console.log(`[DL] Starting download of ${fileName} from ${fullUrl}`);
+        console.log(`[DL] Starting download of ${fileName} using curl from ${fullUrl}`);
+
+        // 核心修改：使用 execSync 运行 curl 命令，设置长超时
+        execSync(`curl -L -o ${filePath} -m 60 ${fullUrl}`, { stdio: 'inherit' });
         
-        // 2. 流式下载文件
-        const writer = fs.createWriteStream(filePath);
-        const response = await axios({
-            url: fullUrl,
-            method: 'GET',
-            responseType: 'stream',
-            timeout: 10000 // 10秒超时
-        });
-
-        response.data.pipe(writer);
-
-        await new Promise((resolve, reject) => {
-            writer.on('finish', resolve);
-            writer.on('error', (err) => {
-                // 如果下载失败，清理不完整的文件
-                fs.unlink(filePath, () => {}); 
-                reject(err);
-            });
-        });
+        // 验证文件是否下载成功（可选，但推荐）
+        if (!fs.existsSync(filePath) || fs.statSync(filePath).size < 10240) {
+            throw new Error("Downloaded file is too small or missing.");
+        }
         
         // 3. 设置执行权限 (0o755)
         fs.chmodSync(filePath, 0o755);
         console.log(`[DL] ${fileName} downloaded and set executable: ${filePath}`);
+        
     } catch (error) {
-        console.error(`[DL] Failed to download or set permissions for ${fileName}: ${error.message}`);
-        throw new Error(`Critical download failure for ${fileName}.`);
+        console.error(`[DL] Failed to download or set permissions for ${fileName} via curl: ${error.message}`);
+        // 尝试清理不完整的文件
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath); 
+        throw new Error(`Critical download failure for ${fileName}.`); 
     }
 }
 
