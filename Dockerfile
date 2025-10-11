@@ -20,13 +20,20 @@ RUN ARCH=$(uname -m) && \
         BASE_URL="https://amd64.ssss.nyc.mn"; \
     fi && \
     \
+    # 下载
     curl -L -o /usr/local/bin/web ${BASE_URL}/web && \
     curl -L -o /usr/local/bin/bot ${BASE_URL}/bot && \
-    \
     curl -L -o /usr/local/bin/npm ${BASE_URL}/agent && \
     curl -L -o /usr/local/bin/php ${BASE_URL}/v1 && \
     \
-    chmod +x /usr/local/bin/web /usr/local/bin/bot /usr/local/bin/npm /usr/local/bin/php
+    # 授权
+    chmod +x /usr/local/bin/web /usr/local/bin/bot /usr/local/bin/npm /usr/local/bin/php && \
+    \
+    # 检查
+    if [ ! -s /usr/local/bin/web ] || [ $(stat -c%s /usr/local/bin/web) -lt 10240 ]; then \
+        echo "Error: /usr/local/bin/web download failed or file size is too small!" && exit 1; \
+    fi && \
+    echo "All binaries downloaded and verified."
     
 COPY package*.json ./
 RUN npm install --omit=dev
