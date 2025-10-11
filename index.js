@@ -58,24 +58,37 @@ const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 // 异步文件下载
 async function downloadFile(fileName, url) {
     const filePath = path.join(FILE_PATH, fileName);
+    
     if (fs.existsSync(filePath)) {
         console.log(`[DL] ${fileName} already exists, skipping download.`);
         return;
     }
 
     try {
+        // 获取架构信息并设置新的 BASE_URL
         const arch = process.arch;
-        let BASE_URL = (arch === 'arm64') ? "https://arm64.ssss.nyc.mn" : "https://amd64.ssss.nyc.mn";
-        const fullUrl = `${BASE_URL}/${url}`;
+        let ARCH_FOLDER;
+        
+        if (arch === 'arm64') {
+            ARCH_FOLDER = "arm64";
+        } else {
+            ARCH_FOLDER = "amd64"; 
+        }
+        
+        // 使用新的基础下载域名
+        const BASE_URL = `https://pan.811520.xyz/cdn/${ARCH_FOLDER}`;
+        const fullUrl = `${BASE_URL}/${url}`; // url 对应 web, bot, agent, v1
+        
         console.log(`[DL] Starting download of ${fileName} from ${fullUrl}`);
         
+        // 流式下载文件 (保持长超时和 IPv4 强制)
         const writer = fs.createWriteStream(filePath);
         const response = await axios({
             url: fullUrl,
             method: 'GET',
             responseType: 'stream',
-            timeout: 60000, 
-            family: 4 
+            timeout: 60000,
+            family: 4
         });
 
         response.data.pipe(writer);
@@ -83,17 +96,18 @@ async function downloadFile(fileName, url) {
         await new Promise((resolve, reject) => {
             writer.on('finish', resolve);
             writer.on('error', (err) => {
+                // 如果下载失败，清理不完整的文件
                 fs.unlink(filePath, () => {}); 
                 reject(err);
             });
         });
         
+        // 设置执行权限 (0o755)
         fs.chmodSync(filePath, 0o755);
         console.log(`[DL] ${fileName} downloaded and set executable: ${filePath}`);
     } catch (error) {
-        console.error(`[DL] Failed to download or set permissions for ${fileName}. Full Error:`, error.message);
-        console.error(`[DL] Stack:`, error.stack);
-        // 确保继续抛出错误，中断服务启动
+        console.error(`[DL] Failed to download or set permissions for ${fileName}. Full Error: ${error.message}`);
+        // 确保抛出错误，中断服务启动
         throw new Error(`Critical download failure for ${fileName}.`); 
     }
 }
