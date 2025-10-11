@@ -212,9 +212,9 @@ uuid: ${UUID}`;
   try {
     const args = ['-c', configPath];
     
-    // 使用 spawn 启动，并保持其输出可见（重要：用于调试）
-    webProcess = spawn(webPath, args, { stdio: 'inherit' });
-    
+    // 使用 spawn 启动，并保持其输出可见
+    const webProcess = spawn('/bin/bash', ['-c', `${webPath} -c ${configPath}`], { stdio: 'inherit' });
+    webProcess.on('error', (err) => console.error(`Xray process failed to start: ${err.message}`));
     webProcess.on('error', (err) => console.error(`Xray process failed to start: ${err.message}`));
     webProcess.on('close', (code) => console.log(`Xray process exited with code ${code}.`));
 
