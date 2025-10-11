@@ -24,11 +24,14 @@ const CFIP = process.env.CFIP || 'cdns.doon.eu.org';
 const CFPORT = process.env.CFPORT || 443;
 const NAME = process.env.NAME || '';
 
-// 定义路径 (基于 FILE_PATH 的路径)
-const webPath = path.join(FILE_PATH, 'web');
-const botPath = path.join(FILE_PATH, 'bot');
-const npmPath = path.join(FILE_PATH, 'npm');
-const phpPath = path.join(FILE_PATH, 'php');
+// 二进制文件路径，由dockerfile下载
+const BIN_PATH = '/usr/local/bin';
+const webPath = path.join(BIN_PATH, 'web');
+const botPath = path.join(BIN_PATH, 'bot');
+const npmPath = path.join(BIN_PATH, 'npm');
+const phpPath = path.join(BIN_PATH, 'php');
+
+// 配置文件路径
 const subPath = path.join(FILE_PATH, 'sub.txt');
 const listPath = path.join(FILE_PATH, 'list.txt');
 const bootLogPath = path.join(FILE_PATH, 'boot.log');
