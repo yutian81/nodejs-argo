@@ -1,6 +1,7 @@
 const express = require("express");
 const app = express();
 const axios = require("axios");
+const { net } = require("net"); 
 const fs = require("fs");
 const path = require("path");
 const { spawn, execSync } = require('child_process');
@@ -66,24 +67,33 @@ async function downloadFile(fileName, url) {
         const arch = process.arch;
         let BASE_URL = (arch === 'arm64') ? "https://arm64.ssss.nyc.mn" : "https://amd64.ssss.nyc.mn";
         const fullUrl = `${BASE_URL}/${url}`;
-        console.log(`[DL] Starting download of ${fileName} using curl from ${fullUrl}`);
+        console.log(`[DL] Starting download of ${fileName} from ${fullUrl}`);
+        
+        const writer = fs.createWriteStream(filePath);
+        const response = await axios({
+            url: fullUrl,
+            method: 'GET',
+            responseType: 'stream',
+            timeout: 60000, 
+            family: 4 
+        });
 
-        // 核心修改：使用 execSync 运行 curl 命令，设置长超时
-        execSync(`curl -L -o ${filePath} -m 60 ${fullUrl}`, { stdio: 'inherit' });
+        response.data.pipe(writer);
+
+        await new Promise((resolve, reject) => {
+            writer.on('finish', resolve);
+            writer.on('error', (err) => {
+                fs.unlink(filePath, () => {}); 
+                reject(err);
+            });
+        });
         
-        // 验证文件是否下载成功（可选，但推荐）
-        if (!fs.existsSync(filePath) || fs.statSync(filePath).size < 10240) {
-            throw new Error("Downloaded file is too small or missing.");
-        }
-        
-        // 3. 设置执行权限 (0o755)
         fs.chmodSync(filePath, 0o755);
         console.log(`[DL] ${fileName} downloaded and set executable: ${filePath}`);
-        
     } catch (error) {
-        console.error(`[DL] Failed to download or set permissions for ${fileName} via curl: ${error.message}`);
-        // 尝试清理不完整的文件
-        if (fs.existsSync(filePath)) fs.unlinkSync(filePath); 
+        console.error(`[DL] Failed to download or set permissions for ${fileName}. Full Error:`, error.message);
+        console.error(`[DL] Stack:`, error.stack);
+        // 确保继续抛出错误，中断服务启动
         throw new Error(`Critical download failure for ${fileName}.`); 
     }
 }
