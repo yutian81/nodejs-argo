@@ -1,20 +1,19 @@
-FROM node:20
+FROM node:alpine3.20
 
-WORKDIR /app
+WORKDIR /tmp
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apk update && apk add --no-cache \
     procps \
     curl \
     coreutils \
     iproute2 \
     gcompat \
-    bash \
-    && rm -rf /var/lib/apt/lists/*
+    bash
 
-# 根据架构下载，这里使用 RUN 命令自动判断架构并下载
-RUN ARCH=$(dpkg --print-architecture) && \
-    if [ "$ARCH" = "arm64" ]; then \
-        echo "Detected ARM64 architecture. Downloading ARM64 binaries."; \
+# 根据服务器架构下载二进制文件
+RUN ARCH=$(uname -m) && \
+    if [ "$ARCH" = "aarch64" ]; then \
+        echo "Detected AArch64/ARM64 architecture. Downloading ARM64 binaries."; \
         BASE_URL="https://arm64.ssss.nyc.mn"; \
     else \
         echo "Using default AMD64 architecture. Downloading AMD64 binaries."; \
@@ -29,15 +28,11 @@ RUN ARCH=$(dpkg --print-architecture) && \
     \
     chmod +x /usr/local/bin/web /usr/local/bin/bot /usr/local/bin/npm /usr/local/bin/php
     
-# 复制依赖和安装
 COPY package*.json ./
 RUN npm install --omit=dev
 
-# 复制应用代码
 COPY . .
 
-# 暴露端口
 EXPOSE 3000
 
-# 运行主应用
 CMD ["node", "index.js"]
