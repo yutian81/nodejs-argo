@@ -209,20 +209,19 @@ uuid: ${UUID}`;
   }
 
   // 2. 运行 xr-ay (web)
-  try {
-    const args = ['-c', configPath];
+  try {
+    // 使用 /bin/bash -c 显式执行命令，提高在容器环境中的兼容性
+    const command = `${webPath} -c ${configPath}`;
+    webProcess = spawn('/bin/bash', ['-c', command], { stdio: 'inherit' });
     
-    // 使用 spawn 启动，并保持其输出可见
-    const webProcess = spawn('/bin/bash', ['-c', `${webPath} -c ${configPath}`], { stdio: 'inherit' });
-    webProcess.on('error', (err) => console.error(`Xray process failed to start: ${err.message}`));
     webProcess.on('error', (err) => console.error(`Xray process failed to start: ${err.message}`));
     webProcess.on('close', (code) => console.log(`Xray process exited with code ${code}.`));
-
+  
     console.log('Xray (web) is running.');
     await delay(3000); // 等待 Xray 启动并监听端口
-  } catch (error) {
-    console.error(`Xray running error: ${error.message}`);
-  }
+  } catch (error) {
+    console.error(`Xray running error: ${error.message}`);
+  }
 
   // 3. 运行 Cloudflare Tunnel (bot)
   if (fs.existsSync(botPath)) {
@@ -238,23 +237,25 @@ uuid: ${UUID}`;
         args = ['tunnel', '--edge-ip-version', 'auto', '--no-autoupdate', '--protocol', 'http2', '--logfile', bootLogPath, '--loglevel', 'info', '--url', `http://localhost:${ARGO_PORT}`];
     }
     
-    try {
-        // 使用 spawn 启动 Cloudflared，保持输出可见并写入日志
-        botProcess = spawn(botPath, args, { stdio: 'inherit' });
-        botProcess.on('error', (err) => console.error(`Cloudflared process failed to start: ${err.message}`));
-        botProcess.on('close', (code) => {
-            if (code !== 0) {
-                // 如果非正常退出（通常为0），则可能是严重错误
-                console.error(`Cloudflared process exited unexpectedly with code ${code}. Check logs for details.`);
-            }
-        }); 
+    try {
+        // 使用 /bin/bash -c 执行完整的 bot 命令
+        const command = `${botPath} ${args.join(' ')}`;
+        botProcess = spawn('/bin/bash', ['-c', command], { stdio: 'inherit' });
 
-        console.log('Cloudflare Tunnel (bot) is running.');
-        await delay(15000); // **关键：延长等待时间**，确保临时域名生成
-    } catch (error) {
-        console.error(`Error executing bot command: ${error.message}`);
-    }
-  }
+        botProcess.on('error', (err) => console.error(`Cloudflared process failed to start: ${err.message}`));
+        botProcess.on('close', (code) => {
+            if (code !== 0) {
+                // 如果非正常退出（通常为0），则可能是严重错误
+                console.error(`Cloudflared process exited unexpectedly with code ${code}. Check logs for details.`);
+            }
+        }); 
+
+        console.log('Cloudflare Tunnel (bot) is running.');
+        await delay(10000); // **关键：延长等待时间**，确保临时域名生成
+    } catch (error) {
+        console.error(`Error executing bot command: ${error.message}`);
+    }
+  }
 }
 
 // 获取固定隧道json
