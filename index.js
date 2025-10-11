@@ -56,7 +56,7 @@ const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 // 异步文件下载
 async function downloadFile(fileName, url) {
-    const filePath = path.join(BIN_PATH, fileName);
+    const filePath = path.join(FILE_PATH, fileName);
     if (fs.existsSync(filePath)) {
         console.log(`[DL] ${fileName} already exists, skipping download.`);
         return;
