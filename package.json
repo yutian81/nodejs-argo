@@ -1,18 +1,15 @@
 {
-  "name": "nodejs-argo",
-  "version": "8.8.8",
-  "description": "Thsi is a node project",
+  "name": "nodejs",
+  "version": "1.0.0",
+  "description": "sbx",
   "main": "index.js",
-  "author": "eooce",
-  "repository": "https://github.com/eooce/nodejs-argo",
-  "license": "MIT",
   "private": false,
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
     "axios": "latest",
-    "express": "^4.18.2"
+    "express": "latest"
   },
   "engines": {
     "node": ">=14"
