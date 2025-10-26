@@ -22,12 +22,17 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Generate timestamp
+      - name: Generate timestamp and change_log
         id: timestamp
         run: |
           export TZ='Asia/Shanghai'
           echo "IMAGE_TAG=$(date +%Y%m%d%H%M%S)" >> $GITHUB_ENV
           echo "CHANGE_TIME=$(date +%Y年%m月%d日-%H:%M:%S)" >> $GITHUB_ENV
+
+          DESCRIPTION=$(cat change_log.md)
+          echo "CHANGE_LOG<<EOF" >> $GITHUB_ENV
+          echo "$DESCRIPTION" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -49,15 +54,11 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/nodejs:${{ env.IMAGE_TAG }}
             ghcr.io/${{ github.repository_owner }}/nodejs:latest
           labels: |
-            com.nodejs.change_log.md: |
-              ## 镜像说明
-              - 仓库地址：`https://github.com/${{ github.repository }}`
-              - 项目描述：基于 `nodejs-argo` 构建的 HTTP 服务器
-              - 支持平台：`linux/amd64`、`linux/arm64`
-              - 最新镜像：`ghcr.io/${{ github.repository_owner }}/nodejs:latest`
-              
-              ## 更新日志 (Change Log) - ${{ env.CHANGE_TIME }}
-              - 以时间戳（北京时间）作为版本号
-              - 本次更新镜像：`ghcr.io/${{ github.repository_owner }}/nodejs:${{ env.IMAGE_TAG }}`
+            org.opencontainers.image.source: https://github.com/${{ github.repository }}
+            org.opencontainers.image.description: HTTP Server built on Node.js.
+            org.opencontainers.image.licenses: MIT
+            org.opencontainers.image.version: ${{ env.IMAGE_TAG }}
+            org.opencontainers.image.revision: ${{ github.sha }}
+            com.nodejs.change_log.md=${{ env.CHANGE_LOG }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
