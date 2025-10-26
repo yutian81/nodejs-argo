@@ -47,12 +47,11 @@ jobs:
           platforms: linux/amd64,linux/arm64
           tags: |
             ghcr.io/${{ github.repository_owner }}/nodejs:${{ env.IMAGE_TAG }}
-            ghcr.io/${{ github.repository_owner }}/nodejs:latest
+            ghcr.io/${{ github.repository_owner }}/nodejs:empty
           labels: |
             org.opencontainers.image.description: 基于 Node.js 构建的 HTTP 服务器
             org.opencontainers.image.source: https://github.com/${{ github.repository }}
             org.opencontainers.image.licenses: MIT
             org.opencontainers.image.revision: ${{ github.sha }}
-            com.nodejs.change_log.md: 最后更新：${{ env.CHANGE_TIME }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
