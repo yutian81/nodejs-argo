@@ -1,0 +1,17 @@
+zerops:
+  - setup: nodejs-argo        # 这里的服务名称需与 Zerops 控制台中创建的服务名称一致
+    build:
+      base: nodejs@22         # 建议使用稳定且更新的 Node.js 版本（如 20）
+      buildCommands:
+        - npm install         # 安装 axios 等依赖包
+      deployFiles:
+        - index.js            # 需要部署的文件/文件夹
+        - index.html
+        - package.json
+        - package-lock.json
+        - node_modules
+      cache:
+        - node_modules        # 缓存依赖以加快后续构建速度
+    run:
+      base: nodejs@22
+      start: npm start        # 会执行 package.json 中定义的 node index.js
