@@ -12,9 +12,9 @@ zerops:
         - node_modules
       cache:
         - node_modules
-      ports:
-        - port: 3000
-          httpSupport: true
       run:
         base: alpine/nodejs@22
+        ports:
+        - port: 3000
+          httpSupport: true
         start: npm start
